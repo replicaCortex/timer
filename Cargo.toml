@@ -10,6 +10,4 @@ color-eyre = "0.6.5"
 crossterm = "0.29.0"
 notify-rust = "4.11.7"
 ratatui = "0.29.0"
-strum = { version = "0.27.2", features = ["derive"] }
-strum_macros = "0.27.2"
 tui-widgets = "0.4.1"

@@ -13,12 +13,15 @@ let
     gdb
   ];
 
-  multiplex = with pkgs; [
-    rust-analyzer
-    ra-multiplex
-    wayland
-    pkg-config
-  ] ++ rust;
+  multiplex =
+    with pkgs;
+    [
+      rust-analyzer
+      ra-multiplex
+      wayland
+      pkg-config
+    ]
+    ++ rust;
 
   server_start = ''
     alias kr="pgrep 'ra-multiplex' | xargs kill"
@@ -32,6 +35,7 @@ let
     alias ct="cargo test"
     alias cc="cargo-clippy"
     alias g="rust-gdb -tui ./target/debug/timer"
+    alias mv="mv -n"
   '';
 in
 pkgs.mkShell {
