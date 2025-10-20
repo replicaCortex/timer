@@ -1,9 +1,11 @@
 mod cli;
+use chrono::{Local, NaiveTime};
 use clap::Parser;
 
 mod mode;
 
 mod ui;
+use humantime::parse_duration;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{self, Event, KeyEvent},
@@ -39,6 +41,7 @@ enum AppState {
 #[derive(Default)]
 pub struct App {
     current_time: chrono::TimeDelta,
+    alarm_time: chrono::DateTime<chrono::Local>,
     startet_time: chrono::TimeDelta,
     timer_state: TimerState,
 
@@ -96,12 +99,15 @@ impl App {
     fn handle_key_event(&mut self, key: KeyEvent) {
         match key.code {
             event::KeyCode::Char(' ') => {
-                if self.current_time == chrono::Duration::zero() {
-                    self.current_time = self.startet_time;
-                } else if self.timer_state == TimerState::Running {
-                    self.timer_state = TimerState::Stop;
-                } else {
-                    self.timer_state = TimerState::Running;
+                if self.mode == mode::Mode::Timer {
+                    if self.current_time == chrono::Duration::zero() {
+                        self.current_time = self.startet_time;
+                        self.reset();
+                    } else if self.timer_state == TimerState::Running {
+                        self.timer_state = TimerState::Stop;
+                    } else {
+                        self.timer_state = TimerState::Running;
+                    }
                 }
             }
 
@@ -117,10 +123,12 @@ impl App {
     }
 
     fn reset(&mut self) {
-        self.current_time = self.startet_time;
+        if self.mode == mode::Mode::Timer {
+            self.current_time = self.startet_time;
 
-        if self.notification_enable {
-            self.send = true;
+            if self.notification_enable {
+                self.send = true;
+            }
         }
     }
 
@@ -145,16 +153,31 @@ impl Widget for &App {
     where
         Self: Sized,
     {
-        let vertical_chunks = Layout::vertical([
-            Constraint::Fill(1),
-            Constraint::Length(8),
-            Constraint::Fill(1),
-        ])
-        .split(area);
+        let vertical_chunks = {
+            if self.mode == mode::Mode::Timer {
+                Layout::vertical([
+                    Constraint::Fill(1),
+                    Constraint::Length(8),
+                    Constraint::Fill(1),
+                ])
+                .split(area)
+            } else {
+                Layout::vertical([
+                    Constraint::Fill(1),
+                    Constraint::Length(1),
+                    Constraint::Length(8),
+                    Constraint::Length(1),
+                    Constraint::Fill(1),
+                ])
+                .split(area)
+            }
+        };
 
         match self.mode {
             mode::Mode::Timer => ui::render_timer(self, vertical_chunks[1], buf),
-            mode::Mode::Alarm => ui::render_alarm(self, area, buf),
+            mode::Mode::Alarm => {
+                ui::render_alarm(self, vertical_chunks[2], vertical_chunks[3], buf)
+            }
         }
     }
 }
@@ -167,7 +190,28 @@ pub fn init_app_and_terminal() -> (App, DefaultTerminal) {
     let terminal = ratatui::init();
     let mut app = App {
         mode: cli.mode,
-        current_time: chrono::Duration::seconds((cli.duration * 60) as i64),
+        alarm_time: {
+            if cli.mode == mode::Mode::Alarm {
+                let target_time = NaiveTime::parse_from_str(&cli.duration, "%H:%M")
+                    .expect("failed to parse time");
+
+                chrono::Local::now()
+                    .date_naive()
+                    .and_time(target_time)
+                    .and_local_timezone(Local)
+                    .unwrap()
+            } else {
+                chrono::Local::now()
+            }
+        },
+        current_time: {
+            if cli.mode == mode::Mode::Timer {
+                let std_duration = parse_duration(&cli.duration).expect("failed to parse time");
+                chrono::Duration::from_std(std_duration).unwrap()
+            } else {
+                calucalte_duration_until(&cli.duration)
+            }
+        },
         notification_enable: { !cli.summary.is_empty() || !cli.body.is_empty() },
         send: { !cli.summary.is_empty() || !cli.body.is_empty() },
 
@@ -217,4 +261,22 @@ pub fn init_thread() -> mpsc::Receiver<AppEvent> {
     });
 
     rc
+}
+
+fn calucalte_duration_until(time_str: &str) -> chrono::TimeDelta {
+    let target_time = NaiveTime::parse_from_str(time_str, "%H:%M").expect("failed to parse time");
+
+    let now = Local::now();
+
+    let mut target_datetime_today = now
+        .date_naive()
+        .and_time(target_time)
+        .and_local_timezone(Local)
+        .unwrap();
+
+    if target_datetime_today <= now {
+        target_datetime_today += chrono::Duration::days(1);
+    }
+
+    target_datetime_today - now
 }

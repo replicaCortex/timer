@@ -1,6 +1,6 @@
 [package]
 name = "timer"
-version = "0.1.0"
+version = "0.0.2"
 edition = "2024"
 
 [dependencies]
@@ -8,6 +8,7 @@ chrono = "0.4.42"
 clap = { version = "4.5.49", features = ["derive"] }
 color-eyre = "0.6.5"
 crossterm = "0.29.0"
+humantime = "2.3.0"
 notify-rust = "4.11.7"
 ratatui = "0.29.0"
 tui-widgets = "0.4.1"

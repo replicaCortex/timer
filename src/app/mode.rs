@@ -1,7 +1,7 @@
 use clap::ValueEnum;
 use std::fmt;
 
-#[derive(Default, Debug, ValueEnum, Clone)]
+#[derive(Default, Debug, ValueEnum, Clone, PartialEq, Copy)]
 pub enum Mode {
     #[default]
     Timer,
